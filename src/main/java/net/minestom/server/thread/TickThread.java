@@ -34,6 +34,10 @@ public final class TickThread extends MinestomThread {
         super(MinecraftServer.THREAD_NAME_TICK + "-" + number);
     }
 
+    public TickThread(@NotNull String name) {
+        super(name);
+    }
+
     public static @Nullable TickThread current() {
         if (Thread.currentThread() instanceof TickThread current)
             return current;
@@ -80,7 +84,7 @@ public final class TickThread extends MinestomThread {
     }
 
     void startTick(CountDownLatch latch, long tickTime) {
-        if (entries.isEmpty()) {
+        if (stop || entries.isEmpty()) {
             // Nothing to tick
             latch.countDown();
             return;

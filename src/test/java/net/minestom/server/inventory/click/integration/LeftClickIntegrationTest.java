@@ -4,6 +4,7 @@ package net.minestom.server.inventory.click.integration;
 import net.minestom.server.coordinate.Pos;
 import net.minestom.server.entity.Player;
 import net.minestom.server.event.inventory.InventoryPreClickEvent;
+import net.minestom.server.inventory.AbstractInventory;
 import net.minestom.server.inventory.Inventory;
 import net.minestom.server.inventory.InventoryType;
 import net.minestom.server.inventory.click.ClickType;
@@ -95,7 +96,7 @@ public class LeftClickIntegrationTest {
                 assertNull(event.getInventory()); // Player inventory
                 assertEquals(0, event.getSlot());
                 assertEquals(ClickType.LEFT_CLICK, event.getClickType());
-                assertEquals(ItemStack.AIR, inventory.getCursorItem(player));
+                assertEquals(ItemStack.AIR, player.getInventory().getCursorItem());
             });
             leftClick(player, 0);
         }
@@ -105,12 +106,12 @@ public class LeftClickIntegrationTest {
                 assertEquals(inventory, event.getInventory());
                 assertEquals(1, event.getSlot());
                 // Ensure that the inventory didn't change yet
-                assertEquals(ItemStack.AIR, inventory.getCursorItem(player));
+                assertEquals(ItemStack.AIR, player.getInventory().getCursorItem());
                 assertEquals(ItemStack.of(Material.DIAMOND), inventory.getItemStack(1));
             });
             leftClickOpenInventory(player, 1);
             // Verify inventory changes
-            assertEquals(ItemStack.of(Material.DIAMOND), inventory.getCursorItem(player));
+            assertEquals(ItemStack.of(Material.DIAMOND), player.getInventory().getCursorItem());
             assertEquals(ItemStack.AIR, inventory.getItemStack(1));
         }
         // Place it back
@@ -118,18 +119,18 @@ public class LeftClickIntegrationTest {
             listener.followup(event -> {
                 assertEquals(inventory, event.getInventory());
                 assertEquals(1, event.getSlot());
-                assertEquals(ItemStack.of(Material.DIAMOND), inventory.getCursorItem(player));
+                assertEquals(ItemStack.of(Material.DIAMOND), player.getInventory().getCursorItem());
                 assertEquals(ItemStack.AIR, inventory.getItemStack(1));
             });
             leftClickOpenInventory(player, 1);
-            assertEquals(ItemStack.AIR, inventory.getCursorItem(player));
+            assertEquals(ItemStack.AIR, player.getInventory().getCursorItem());
             assertEquals(ItemStack.of(Material.DIAMOND), inventory.getItemStack(1));
         }
         // Cancel event
         {
             listener.followup(event -> event.setCancelled(true));
             leftClickOpenInventory(player, 1);
-            assertEquals(ItemStack.AIR, inventory.getCursorItem(player), "Left click cancellation did not work");
+            assertEquals(ItemStack.AIR, player.getInventory().getCursorItem(), "Left click cancellation did not work");
             assertEquals(ItemStack.of(Material.DIAMOND), inventory.getItemStack(1));
         }
         // Change items
@@ -141,7 +142,7 @@ public class LeftClickIntegrationTest {
                 event.setCursorItem(ItemStack.of(Material.DIAMOND));
             });
             leftClick(player, 9);
-            assertEquals(ItemStack.AIR, inventory.getCursorItem(player));
+            assertEquals(ItemStack.AIR, player.getInventory().getCursorItem());
             assertEquals(ItemStack.of(Material.DIAMOND, 6), player.getInventory().getItemStack(9));
         }
     }
@@ -154,14 +155,14 @@ public class LeftClickIntegrationTest {
         _leftClick(player.getOpenInventory(), false, player, slot);
     }
 
-    private void _leftClick(Inventory openInventory, boolean clickOpenInventory, Player player, int slot) {
+    private void _leftClick(AbstractInventory openInventory, boolean clickOpenInventory, Player player, int slot) {
         final byte windowId = openInventory != null ? openInventory.getWindowId() : 0;
         if (clickOpenInventory) {
             assert openInventory != null;
             // Do not touch slot
         } else {
             int offset = openInventory != null ? openInventory.getInnerSize() : 0;
-            slot = PlayerInventoryUtils.convertToPacketSlot(slot);
+            slot = PlayerInventoryUtils.convertMinestomSlotToWindowSlot(slot);
             if (openInventory != null) {
                 slot = slot - 9 + offset;
             }

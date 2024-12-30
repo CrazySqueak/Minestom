@@ -2,7 +2,8 @@ package net.minestom.server.entity.metadata.other;
 
 import net.kyori.adventure.nbt.CompoundBinaryTag;
 import net.minestom.server.entity.Entity;
-import net.minestom.server.entity.Metadata;
+import net.minestom.server.entity.MetadataDef;
+import net.minestom.server.entity.MetadataHolder;
 import net.minestom.server.entity.metadata.EntityMeta;
 import net.minestom.server.entity.metadata.ObjectDataProvider;
 import net.minestom.server.network.NetworkBuffer;
@@ -17,23 +18,21 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import java.util.Comparator;
 
 public class PaintingMeta extends EntityMeta implements ObjectDataProvider {
-    public static final byte OFFSET = EntityMeta.MAX_OFFSET;
-    public static final byte MAX_OFFSET = OFFSET + 1;
-
     private Orientation orientation = null;
 
-    public PaintingMeta(@NotNull Entity entity, @NotNull Metadata metadata) {
+    public PaintingMeta(@NotNull Entity entity, @NotNull MetadataHolder metadata) {
         super(entity, metadata);
     }
 
     public @NotNull DynamicRegistry.Key<Variant> getVariant() {
-        return super.metadata.getIndex(OFFSET, Variant.KEBAB);
+        return metadata.get(MetadataDef.Painting.VARIANT);
     }
 
     public void setVariant(@NotNull DynamicRegistry.Key<Variant> value) {
-        super.metadata.setIndex(OFFSET, Metadata.PaintingVariant(value));
+        metadata.set(MetadataDef.Painting.VARIANT, value);
     }
 
     @NotNull
@@ -103,7 +102,8 @@ public class PaintingMeta extends EntityMeta implements ObjectDataProvider {
         static @NotNull DynamicRegistry<Variant> createDefaultRegistry() {
             return DynamicRegistry.create(
                     "minecraft:painting_variant", VariantImpl.REGISTRY_NBT_TYPE, Registry.Resource.PAINTING_VARIANTS,
-                    (namespace, props) -> new VariantImpl(Registry.paintingVariant(namespace, props))
+                    (namespace, props) -> new VariantImpl(Registry.paintingVariant(namespace, props)),
+                    Comparator.naturalOrder()
             );
         }
 

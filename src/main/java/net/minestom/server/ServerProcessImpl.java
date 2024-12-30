@@ -27,7 +27,9 @@ import net.minestom.server.message.ChatType;
 import net.minestom.server.monitoring.BenchmarkManager;
 import net.minestom.server.monitoring.TickMonitor;
 import net.minestom.server.network.ConnectionManager;
-import net.minestom.server.network.PacketProcessor;
+import net.minestom.server.network.packet.PacketParser;
+import net.minestom.server.network.packet.PacketVanilla;
+import net.minestom.server.network.packet.client.ClientPacket;
 import net.minestom.server.network.socket.Server;
 import net.minestom.server.recipe.RecipeManager;
 import net.minestom.server.registry.DynamicRegistry;
@@ -35,9 +37,9 @@ import net.minestom.server.scoreboard.TeamManager;
 import net.minestom.server.snapshot.*;
 import net.minestom.server.thread.Acquirable;
 import net.minestom.server.thread.ThreadDispatcher;
+import net.minestom.server.thread.ThreadProvider;
 import net.minestom.server.timer.SchedulerManager;
-import net.minestom.server.utils.PacketUtils;
-import net.minestom.server.utils.PropertyUtils;
+import net.minestom.server.utils.PacketViewableUtils;
 import net.minestom.server.utils.collection.MappedCollection;
 import net.minestom.server.utils.nbt.BinaryTagSerializer;
 import net.minestom.server.world.DimensionType;
@@ -55,7 +57,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 final class ServerProcessImpl implements ServerProcess {
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerProcessImpl.class);
-    private static final Boolean SHUTDOWN_ON_SIGNAL = PropertyUtils.getBoolean("minestom.shutdown-on-signal", true);
 
     private final ExceptionManager exception;
 
@@ -78,7 +79,7 @@ final class ServerProcessImpl implements ServerProcess {
 
     private final ConnectionManager connection;
     private final PacketListenerManager packetListener;
-    private final PacketProcessor packetProcessor;
+    private final PacketParser<ClientPacket> packetParser;
     private final InstanceManager instance;
     private final BlockManager block;
     private final CommandManager command;
@@ -99,7 +100,7 @@ final class ServerProcessImpl implements ServerProcess {
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean stopped = new AtomicBoolean();
 
-    public ServerProcessImpl() throws IOException {
+    public ServerProcessImpl() {
         this.exception = new ExceptionManager();
 
         // The order of initialization here is relevant, we must load the enchantment util registries before the vanilla data is loaded.
@@ -123,7 +124,7 @@ final class ServerProcessImpl implements ServerProcess {
 
         this.connection = new ConnectionManager();
         this.packetListener = new PacketListenerManager();
-        this.packetProcessor = new PacketProcessor(packetListener);
+        this.packetParser = PacketVanilla.CLIENT_PACKET_PARSER;
         this.instance = new InstanceManager(this);
         this.block = new BlockManager();
         this.command = new CommandManager();
@@ -136,9 +137,9 @@ final class ServerProcessImpl implements ServerProcess {
         this.bossBar = new BossBarManager();
         this.tag = new TagManager();
 
-        this.server = new Server(packetProcessor);
+        this.server = new Server(packetParser);
 
-        this.dispatcher = ThreadDispatcher.singleThread();
+        this.dispatcher = ThreadDispatcher.of(ThreadProvider.counter(), ServerFlag.DISPATCHER_THREADS);
         this.ticker = new TickerImpl();
     }
 
@@ -288,8 +289,8 @@ final class ServerProcessImpl implements ServerProcess {
     }
 
     @Override
-    public @NotNull PacketProcessor packetProcessor() {
-        return packetProcessor;
+    public @NotNull PacketParser<ClientPacket> packetParser() {
+        return packetParser;
     }
 
     @Override
@@ -329,7 +330,7 @@ final class ServerProcessImpl implements ServerProcess {
         LOGGER.info(MinecraftServer.getBrandName() + " server started successfully.");
 
         // Stop the server on SIGINT
-        if (SHUTDOWN_ON_SIGNAL) Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
+        if (ServerFlag.SHUTDOWN_ON_SIGNAL) Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
     }
 
     @Override
@@ -380,10 +381,7 @@ final class ServerProcessImpl implements ServerProcess {
             scheduler().processTickEnd();
 
             // Flush all waiting packets
-            PacketUtils.flush();
-
-            // Server connection tick
-            server().tick();
+            PacketViewableUtils.flush();
 
             // Monitoring
             {
